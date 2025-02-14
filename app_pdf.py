@@ -11,6 +11,7 @@ from langchain_groq.chat_models import ChatGroq
 import os
 import time
 from pathlib import Path
+from PyPDF2 import PdfFileReader  # To check PDF metadata manually if needed
 
 
 # Create .streamlit directory if it doesn't exist
@@ -24,7 +25,7 @@ with open('.streamlit/config.toml', 'w') as f:
 PDF_FOLDER = "pdf_folder"
 os.makedirs(PDF_FOLDER, exist_ok=True)
 
-# Only process PDF files from this folder
+# Function to handle PDF metadata issues
 def process_pdf_from_folder(pdf_folder):
     # Collect all PDF files in the folder
     pdf_files = [f for f in os.listdir(pdf_folder) if f.lower().endswith('.pdf')]
@@ -35,17 +36,36 @@ def process_pdf_from_folder(pdf_folder):
     try:
         # Process the first PDF file in the folder
         pdf_path = os.path.join(pdf_folder, pdf_files[0])
-        
+
+        # Check metadata before loading PDF
+        print(f"Checking metadata for file: {pdf_path}")
+        try:
+            with open(pdf_path, "rb") as file:
+                pdf_reader = PdfFileReader(file)
+                metadata = pdf_reader.getDocumentInfo()
+                #print("PDF Metadata:", metadata)
+        except Exception as e:
+            print(f"Warning: Failed to read metadata for {pdf_path}. Continuing without metadata. Error: {str(e)}")
+
         # Use PDFMinerLoader to process the PDF
-        loader = PDFMinerLoader(pdf_path)
-        documents = loader.load()
+        try:
+            loader = PDFMinerLoader(pdf_path)
+            documents = loader.load()
+        except Exception as e:
+            print(f"Error loading PDF with PDFMinerLoader: {str(e)}. Attempting to process without metadata.")
+            documents = []  # Fallback if PDFMinerLoader fails
+
+        if not documents:
+            raise ValueError("No documents extracted from PDF. Please check the file content.")
         
+        # Split the extracted text
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
         splits = text_splitter.split_documents(documents)
         
+        # Create a vector store
         vectorstore = FAISS.from_documents(splits, GPT4AllEmbeddings())
         
         return vectorstore
@@ -70,11 +90,10 @@ def safe_remove(filepath):
                 print(f"Warning: Could not remove temporary file {filepath}")
 
 def get_response(user_query, chat_history, vectorstore=None):
-    #llm = ChatOllama(model="mistral")
+    # llm = ChatOllama(model="mistral")
     llm = ChatGroq(
-    model_name="mixtral-8x7b-32768",
-    #api_key=os.environ.get("groq_api_key")  # Use .get() to avoid KeyError
-    api_key="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"
+        model_name="mixtral-8x7b-32768",
+        api_key="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"
     )
     
     if vectorstore:
@@ -120,15 +139,13 @@ st.image("logo.png", width=800)
 st.markdown("### Chatbot Assistant", unsafe_allow_html=True)
 
 # Sidebar info
-# st.sidebar.image("images/logo_no_bkd.png", width=120)
+#st.sidebar.image("logo_kepler.jpeg", width=80)
 # st.sidebar.markdown("### Supported Formats")
 # st.sidebar.markdown("""
 # <small>
 # - Only PDFs are processed automatically from the 'pdf_folder' directory.
 # </small>
 # """, unsafe_allow_html=True)
-
-
 
 # Process PDFs from the specified folder (no upload option)
 if "vectorstore" not in st.session_state:
@@ -138,9 +155,8 @@ try:
     # Process PDF files from the folder
     with st.spinner("Processing document..."):
         st.session_state.vectorstore = process_pdf_from_folder(PDF_FOLDER)
-    st.sidebar.success("ChatBot Initalized OK!")
+    st.sidebar.success("ChatBot Initialized OK!")
 except Exception as e:
-    #st.sidebar.error(f"Error processing PDF: {str(e)}")
     st.sidebar.error(f"Error processing PDFs: {str(e)}")
 
 st.sidebar.markdown("<small>keplerasuscholars@asu.edu </small>", unsafe_allow_html=True)
