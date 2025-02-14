@@ -11,7 +11,7 @@ from langchain_groq.chat_models import ChatGroq
 import os
 import time
 from pathlib import Path
-from PyPDF2 import PdfFileReader  # To check PDF metadata manually if needed
+from PyPDF2 import PdfReader  # Replaced PdfFileReader with PdfReader
 
 
 # Create .streamlit directory if it doesn't exist
@@ -41,9 +41,9 @@ def process_pdf_from_folder(pdf_folder):
         print(f"Checking metadata for file: {pdf_path}")
         try:
             with open(pdf_path, "rb") as file:
-                pdf_reader = PdfFileReader(file)
-                metadata = pdf_reader.getDocumentInfo()
-                #print("PDF Metadata:", metadata)
+                pdf_reader = PdfReader(file)
+                metadata = pdf_reader.metadata
+                print("PDF Metadata:", metadata)
         except Exception as e:
             print(f"Warning: Failed to read metadata for {pdf_path}. Continuing without metadata. Error: {str(e)}")
 
