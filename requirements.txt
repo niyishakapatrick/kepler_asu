@@ -10,3 +10,5 @@ langchain_groq
 python-dotenv
 pathlib
 langchain_core
+pymupdf
+PyPDF2
