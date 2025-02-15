@@ -6,7 +6,7 @@ from langchain_core.output_parsers import StrOutputParser
 import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_community.vectorstores import FAISS
-from sentence_transformers import SentenceTransformer  # Direct import from sentence-transformers
+from sentence_transformers import SentenceTransformer
 from langchain_groq.chat_models import ChatGroq
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
