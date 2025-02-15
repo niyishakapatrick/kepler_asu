@@ -13,3 +13,4 @@ langchain_core
 pymupdf
 PyPDF2
 python-docx
+docx
