@@ -5,57 +5,46 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage
-from langchain_community.document_loaders import PDFMinerLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import GPT4AllEmbeddings
 from langchain_groq.chat_models import ChatGroq
-from PyPDF2 import PdfReader  # Replaced PdfFileReader with PdfReader
-
+from langchain.schema import Document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+import docx
 
 # Create .streamlit directory and config.toml if they don't exist
 os.makedirs('.streamlit', exist_ok=True)
 with open('.streamlit/config.toml', 'w') as f:
     f.write('[client]\ntoolbarMode = "minimal"')
 
-# Function to handle processing the specific PDF
-def process_pdf():
-    pdf_filename = "2025_FAQ_Frequently_Asked_Questions ASU_Kepler.pdf"
+# Function to handle processing the specific .docx
+def process_docx():
+    docx_filename = "2025_FAQ.docx"
     
-    if not os.path.exists(pdf_filename):
-        raise ValueError(f"PDF file '{pdf_filename}' not found in the current directory.")
+    if not os.path.exists(docx_filename):
+        raise ValueError(f".docx file '{docx_filename}' not found in the current directory.")
     
     temp_files = []
     try:
-        # Check metadata before loading PDF
-        print(f"Checking metadata for file: {pdf_filename}")
-        try:
-            with open(pdf_filename, "rb") as file:
-                pdf_reader = PdfReader(file)
-                metadata = pdf_reader.metadata
-                print("PDF Metadata:", metadata)
-        except Exception as e:
-            print(f"Warning: Failed to read metadata for {pdf_filename}. Continuing without metadata. Error: {str(e)}")
+        # Read text from the .docx file
+        print(f"Reading .docx file: {docx_filename}")
+        doc = docx.Document(docx_filename)
+        text = "\n".join([para.text for para in doc.paragraphs if para.text.strip() != ""])
 
-        # Use PDFMinerLoader to process the PDF
-        try:
-            loader = PDFMinerLoader(pdf_filename)
-            documents = loader.load()
-        except Exception as e:
-            print(f"Error loading PDF with PDFMinerLoader: {str(e)}. Attempting to process without metadata.")
-            documents = []  # Fallback if PDFMinerLoader fails
-
-        if not documents:
-            raise ValueError(f"No documents extracted from PDF '{pdf_filename}'. Please check the file content.")
+        if not text:
+            raise ValueError(f"No text extracted from .docx '{docx_filename}'. Please check the file content.")
         
-        # Split the extracted text
+        # Create Document objects for each chunk of text
+        documents = [Document(page_content=text)]
+        
+        # Split the extracted text into smaller chunks
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
         splits = text_splitter.split_documents(documents)
         
-        # Create a vector store
+        # Create a vector store from the splits
         vectorstore = FAISS.from_documents(splits, GPT4AllEmbeddings())
         
         return vectorstore
@@ -138,13 +127,13 @@ st.sidebar.markdown("<small>keplerasuscholars@asu.edu </small>", unsafe_allow_ht
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
 
-# Process the specific PDF file (2025_FAQ_Frequently_Asked_Questions ASU_Kepler.pdf)
+# Process the specific .docx file (2025_FAQ_Frequently_Asked_Questions ASU_Kepler.docx)
 try:
     with st.spinner("Processing document..."):
-        st.session_state.vectorstore = process_pdf()
+        st.session_state.vectorstore = process_docx()
     st.sidebar.success("ChatBot Initialized OK!")
 except Exception as e:
-    st.sidebar.error(f"Error processing PDF: {str(e)}")
+    st.sidebar.error(f"Error processing .docx: {str(e)}")
 
 # Initialize chat history if not already initialized
 if "chat_history" not in st.session_state:
