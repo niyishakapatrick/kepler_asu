@@ -1,6 +1,5 @@
 import os
 import time
-from pathlib import Path
 from langchain_community.chat_models import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -19,38 +18,35 @@ os.makedirs('.streamlit', exist_ok=True)
 with open('.streamlit/config.toml', 'w') as f:
     f.write('[client]\ntoolbarMode = "minimal"')
 
-# Function to handle PDF metadata issues
-def process_pdf_from_folder():
-    # Collect all PDF files in the current directory (same as .py file)
-    pdf_files = [f for f in os.listdir('.') if f.lower().endswith('.pdf')]
-    if not pdf_files:
-        raise ValueError("No PDF files found in the current directory.")
+# Function to handle processing the specific PDF
+def process_pdf():
+    pdf_filename = "2025_FAQ_Frequently_Asked_Questions ASU_Kepler.pdf"
+    
+    if not os.path.exists(pdf_filename):
+        raise ValueError(f"PDF file '{pdf_filename}' not found in the current directory.")
     
     temp_files = []
     try:
-        # Process the first PDF file in the folder
-        pdf_path = os.path.join('.', pdf_files[0])
-
         # Check metadata before loading PDF
-        print(f"Checking metadata for file: {pdf_path}")
+        print(f"Checking metadata for file: {pdf_filename}")
         try:
-            with open(pdf_path, "rb") as file:
+            with open(pdf_filename, "rb") as file:
                 pdf_reader = PdfReader(file)
                 metadata = pdf_reader.metadata
                 print("PDF Metadata:", metadata)
         except Exception as e:
-            print(f"Warning: Failed to read metadata for {pdf_path}. Continuing without metadata. Error: {str(e)}")
+            print(f"Warning: Failed to read metadata for {pdf_filename}. Continuing without metadata. Error: {str(e)}")
 
         # Use PDFMinerLoader to process the PDF
         try:
-            loader = PDFMinerLoader(pdf_path)
+            loader = PDFMinerLoader(pdf_filename)
             documents = loader.load()
         except Exception as e:
             print(f"Error loading PDF with PDFMinerLoader: {str(e)}. Attempting to process without metadata.")
             documents = []  # Fallback if PDFMinerLoader fails
 
         if not documents:
-            raise ValueError("No documents extracted from PDF. Please check the file content.")
+            raise ValueError(f"No documents extracted from PDF '{pdf_filename}'. Please check the file content.")
         
         # Split the extracted text
         text_splitter = RecursiveCharacterTextSplitter(
@@ -83,6 +79,7 @@ def safe_remove(filepath):
             else:
                 print(f"Warning: Could not remove temporary file {filepath}")
 
+# Function to get the response based on user query
 def get_response(user_query, chat_history, vectorstore=None):
     # Initialize ChatGroq model with your API key
     llm = ChatGroq(
@@ -141,13 +138,13 @@ st.sidebar.markdown("<small>keplerasuscholars@asu.edu </small>", unsafe_allow_ht
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
 
-# Process PDF files from the current directory (no upload option)
+# Process the specific PDF file (2025_FAQ_Frequently_Asked_Questions ASU_Kepler.pdf)
 try:
     with st.spinner("Processing document..."):
-        st.session_state.vectorstore = process_pdf_from_folder()
+        st.session_state.vectorstore = process_pdf()
     st.sidebar.success("ChatBot Initialized OK!")
 except Exception as e:
-    st.sidebar.error(f"Error processing PDFs: {str(e)}")
+    st.sidebar.error(f"Error processing PDF: {str(e)}")
 
 # Initialize chat history if not already initialized
 if "chat_history" not in st.session_state:
