@@ -6,16 +6,28 @@ from langchain_core.output_parsers import StrOutputParser
 import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import GPT4AllEmbeddings
+from sentence_transformers import SentenceTransformer  # Direct import from sentence-transformers
 from langchain_groq.chat_models import ChatGroq
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import docx
+from langchain.embeddings.base import Embeddings
 
 # Create .streamlit directory and config.toml if they don't exist
 os.makedirs('.streamlit', exist_ok=True)
 with open('.streamlit/config.toml', 'w') as f:
     f.write('[client]\ntoolbarMode = "minimal"')
+
+# Create a custom embeddings class
+class SentenceTransformersEmbeddings(Embeddings):
+    def __init__(self, model_name: str = 'all-MiniLM-L6-v2'):
+        self.model = SentenceTransformer(model_name)
+
+    def embed_documents(self, texts: list) -> list:
+        return self.model.encode(texts, convert_to_tensor=True).tolist()
+
+    def embed_query(self, text: str) -> list:
+        return self.model.encode(text, convert_to_tensor=True).tolist()
 
 # Function to handle processing the specific .docx
 def process_docx():
@@ -44,8 +56,11 @@ def process_docx():
         )
         splits = text_splitter.split_documents(documents)
         
-        # Create a vector store from the splits
-        vectorstore = FAISS.from_documents(splits, GPT4AllEmbeddings())
+        # Use SentenceTransformers for embeddings (no API key required)
+        embeddings = SentenceTransformersEmbeddings(model_name='all-MiniLM-L6-v2')  # Using custom embeddings
+        
+        # Create a vector store from the splits using Sentence-Transformers embeddings
+        vectorstore = FAISS.from_documents(splits, embeddings)
         
         return vectorstore
         
@@ -120,7 +135,7 @@ st.image("logo.png", width=800)
 st.markdown("### Chatbot Assistant", unsafe_allow_html=True)
 
 # Sidebar info
-st.sidebar.image("qr-code.png",width=200)
+st.sidebar.image("qr-code.png", width=200)
 st.sidebar.markdown("<small>keplerasuscholars@asu.edu </small>", unsafe_allow_html=True)
 
 # Initialize vectorstore if not available
@@ -128,12 +143,13 @@ if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
 
 # Process the specific .docx file (2025_FAQ_Frequently_Asked_Questions ASU_Kepler.docx)
-try:
-    with st.spinner("Processing document..."):
-        st.session_state.vectorstore = process_docx()
-    st.sidebar.success("ChatBot Initialized OK!")
-except Exception as e:
-    st.sidebar.error(f"Error processing .docx: {str(e)}")
+if not st.session_state.vectorstore:  # Only process if vectorstore is not already available
+    try:
+        with st.spinner("Processing document..."):
+            st.session_state.vectorstore = process_docx()
+        st.sidebar.success("ChatBot Initialized OK!")
+    except Exception as e:
+        st.sidebar.error(f"Error processing .docx: {str(e)}")
 
 # Initialize chat history if not already initialized
 if "chat_history" not in st.session_state:

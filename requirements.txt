@@ -14,3 +14,4 @@ pymupdf
 PyPDF2
 python-docx
 docx
+sentence_transformers
