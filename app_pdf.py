@@ -21,55 +21,59 @@ os.makedirs('.streamlit', exist_ok=True)
 with open('.streamlit/config.toml', 'w') as f:
     f.write('[client]\ntoolbarMode = "minimal"')
 
-# Define folder for PDFs
-PDF_FOLDER = "pdf_folder"
+# Define the PDF folder path (same directory as the script)
+PDF_FOLDER = Path(__file__).parent / "pdf_folder"  # Use the parent directory of the script
 os.makedirs(PDF_FOLDER, exist_ok=True)
 
 # Function to handle PDF metadata issues
-def process_pdf_from_folder(pdf_folder):
+def process_pdfs_from_folder(pdf_folder):
     # Collect all PDF files in the folder
     pdf_files = [f for f in os.listdir(pdf_folder) if f.lower().endswith('.pdf')]
     if not pdf_files:
         raise ValueError("No PDF files found in the specified folder.")
-    
+
     temp_files = []
+    all_documents = []
+
     try:
-        # Process the first PDF file in the folder
-        pdf_path = os.path.join(pdf_folder, pdf_files[0])
+        # Loop through each PDF file and process it
+        for pdf_file in pdf_files:
+            pdf_path = os.path.join(pdf_folder, pdf_file)
 
-        # Check metadata before loading PDF
-        print(f"Checking metadata for file: {pdf_path}")
-        try:
-            with open(pdf_path, "rb") as file:
-                pdf_reader = PdfReader(file)
-                metadata = pdf_reader.metadata
-                print("PDF Metadata:", metadata)
-        except Exception as e:
-            print(f"Warning: Failed to read metadata for {pdf_path}. Continuing without metadata. Error: {str(e)}")
+            # Check metadata before loading PDF
+            print(f"Checking metadata for file: {pdf_path}")
+            try:
+                with open(pdf_path, "rb") as file:
+                    pdf_reader = PdfReader(file)
+                    metadata = pdf_reader.metadata
+                    print("PDF Metadata:", metadata)
+            except Exception as e:
+                print(f"Warning: Failed to read metadata for {pdf_path}. Continuing without metadata. Error: {str(e)}")
 
-        # Use PDFMinerLoader to process the PDF
-        try:
-            loader = PDFMinerLoader(pdf_path)
-            documents = loader.load()
-        except Exception as e:
-            print(f"Error loading PDF with PDFMinerLoader: {str(e)}. Attempting to process without metadata.")
-            documents = []  # Fallback if PDFMinerLoader fails
+            # Use PDFMinerLoader to process the PDF
+            try:
+                loader = PDFMinerLoader(pdf_path)
+                documents = loader.load()
+                all_documents.extend(documents)  # Add the extracted documents from this PDF
+            except Exception as e:
+                print(f"Error loading PDF with PDFMinerLoader: {str(e)}. Attempting to process without metadata.")
+                documents = []  # Fallback if PDFMinerLoader fails
 
-        if not documents:
-            raise ValueError("No documents extracted from PDF. Please check the file content.")
-        
+        if not all_documents:
+            raise ValueError("No documents extracted from any PDF. Please check the file content.")
+
         # Split the extracted text
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
-        splits = text_splitter.split_documents(documents)
-        
-        # Create a vector store
+        splits = text_splitter.split_documents(all_documents)
+
+        # Create a vector store from all documents
         vectorstore = FAISS.from_documents(splits, GPT4AllEmbeddings())
-        
+
         return vectorstore
-        
+
     finally:
         # Cleanup any temporary files (if any were created)
         for temp_file in temp_files:
@@ -154,7 +158,7 @@ if "vectorstore" not in st.session_state:
 try:
     # Process PDF files from the folder
     with st.spinner("Processing document..."):
-        st.session_state.vectorstore = process_pdf_from_folder(PDF_FOLDER)
+        st.session_state.vectorstore = process_pdfs_from_folder(PDF_FOLDER)
     st.sidebar.success("ChatBot Initialized OK!")
 except Exception as e:
     st.sidebar.error(f"Error processing PDFs: {str(e)}")
