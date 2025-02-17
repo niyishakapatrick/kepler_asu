@@ -88,7 +88,7 @@ def get_response(user_query, chat_history, vectorstore=None):
     # Initialize ChatGroq model with your API key
     llm = ChatGroq(
         model_name="mixtral-8x7b-32768",
-        api_key="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"  # Replace with your actual API key
+        api_key="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"  # Replace with your actual API key
     )
     
     if vectorstore:
